@@ -41,15 +41,7 @@ O M5StickC Plus2 não tem slot de SD embutido — precisa de um módulo externo 
 
 ## Scripts
 
-Ficam em `/scripts/<pasta>/*.txt` no cartão SD — uma pasta por fila, nome da pasta é o que aparece no M5. Dentro da pasta, os arquivos rodam em ordem alfabética (`01_`, `02_`...). Linguagem simples, uma instrução por linha:
-
-- `STRING <texto>` — digita o texto literal
-- `DELAY <ms>` — espera
-- `ENTER`, `TAB` — teclas
-- `GUI <letra>` — Windows + letra (ex.: `GUI R` abre o Executar)
-- linha vazia ou começando com `#` — ignorada
-
-Limite: **~100 caracteres por linha** (buffer do Digispark). Não tem mais limite de tamanho total do script nem da fila — é tudo tunelado, linha por linha, sem guardar em memória. Um `DELAY` numa linha só não pode passar de ~15s, senão o M5 acha que o Digispark parou de responder e cancela a fila.
+Como escrever e organizar os scripts: [SCRIPT.MD](SCRIPT.MD).
 
 ## Onde está o quê
 
