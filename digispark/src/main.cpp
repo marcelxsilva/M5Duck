@@ -3,6 +3,7 @@
 static const uint8_t DATA_PIN = 2;
 static const unsigned int BIT_US = 104;
 static const uint8_t ACK_BYTE = 0x06;
+static const uint8_t READY_BYTE = 0x05;
 static const uint8_t MAX_LINE_LEN = 100;
 
 bool readByteBlocking(uint8_t &out, unsigned long timeoutMs) {
@@ -34,12 +35,12 @@ bool readByteBlocking(uint8_t &out, unsigned long timeoutMs) {
   return true;
 }
 
-void sendAck() {
+void sendByte(uint8_t value) {
   pinMode(DATA_PIN, OUTPUT);
   digitalWrite(DATA_PIN, LOW);
   delayMicroseconds(BIT_US);
   for (uint8_t i = 0; i < 8; i++) {
-    digitalWrite(DATA_PIN, (ACK_BYTE >> i) & 1);
+    digitalWrite(DATA_PIN, (value >> i) & 1);
     delayMicroseconds(BIT_US);
   }
   digitalWrite(DATA_PIN, HIGH);
@@ -47,12 +48,20 @@ void sendAck() {
   pinMode(DATA_PIN, INPUT);
 }
 
+void waitUntilConnectedAndSignalReady() {
+  pinMode(DATA_PIN, INPUT);
+  while (usbConfiguration == 0) {
+    DigiKeyboard.update();
+  }
+  sendByte(READY_BYTE);
+}
+
 bool readLine(char *buf, uint8_t maxLen) {
   uint8_t pos = 0;
 
   while (true) {
     uint8_t b;
-    if (!readByteBlocking(b, 60000UL)) {
+    if (!readByteBlocking(b, 3000UL)) {
       return false;
     }
     if (b == '\n') {
@@ -116,14 +125,26 @@ void typeLine(char *line) {
   }
 }
 
+bool signaledReady = false;
+
 void setup() {
   pinMode(DATA_PIN, INPUT);
 }
 
 void loop() {
+  if (usbConfiguration == 0) {
+    signaledReady = false;
+  }
+
+  if (!signaledReady) {
+    waitUntilConnectedAndSignalReady();
+    signaledReady = true;
+    return;
+  }
+
   char line[MAX_LINE_LEN];
   if (readLine(line, MAX_LINE_LEN)) {
     typeLine(line);
-    sendAck();
+    sendByte(ACK_BYTE);
   }
 }
