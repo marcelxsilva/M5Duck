@@ -11,26 +11,66 @@ static const int PIN_DIGISPARK = 25;
 static const char *SCRIPTS_DIR = "/scripts";
 static const unsigned int BIT_US = 104;
 static const uint8_t ACK_BYTE = 0x06;
+static const uint8_t READY_BYTE = 0x05;
 static const unsigned long ACK_TIMEOUT_MS = 15000;
-static const uint8_t MAX_SCRIPTS = 30;
+static const uint8_t MAX_ITEMS = 30;
 static const uint8_t VISIBLE_ROWS = 5;
 
 SPIClass sdSPI(HSPI);
 
-String scriptNames[MAX_SCRIPTS];
+String folderNames[MAX_ITEMS];
+uint8_t folderCount = 0;
+uint8_t selectedFolder = 0;
+
+String scriptNames[MAX_ITEMS];
 uint8_t scriptCount = 0;
-uint8_t selectedIndex = 0;
+
 bool sdReady = false;
 
-void listScripts() {
-  scriptCount = 0;
+void sortStrings(String *items, uint8_t count) {
+  for (uint8_t i = 1; i < count; i++) {
+    String key = items[i];
+    int8_t j = i - 1;
+    while (j >= 0 && strcmp(items[j].c_str(), key.c_str()) > 0) {
+      items[j + 1] = items[j];
+      j--;
+    }
+    items[j + 1] = key;
+  }
+}
+
+void listFolders() {
+  folderCount = 0;
   File dir = SD.open(SCRIPTS_DIR);
   if (!dir || !dir.isDirectory()) {
     return;
   }
 
   File entry = dir.openNextFile();
-  while (entry && scriptCount < MAX_SCRIPTS) {
+  while (entry && folderCount < MAX_ITEMS) {
+    if (entry.isDirectory()) {
+      folderNames[folderCount++] = entry.name();
+    }
+    entry = dir.openNextFile();
+  }
+  dir.close();
+
+  sortStrings(folderNames, folderCount);
+  if (selectedFolder >= folderCount) {
+    selectedFolder = 0;
+  }
+}
+
+void listScriptsInFolder(const String &folder) {
+  scriptCount = 0;
+  String path = String(SCRIPTS_DIR) + "/" + folder;
+  File dir = SD.open(path);
+  if (!dir || !dir.isDirectory()) {
+    return;
+  }
+
+  File entry = dir.openNextFile();
+  while (entry && scriptCount < MAX_ITEMS) {
     if (!entry.isDirectory()) {
       String name = entry.name();
       if (name.endsWith(".txt")) {
@@ -40,39 +80,29 @@ void listScripts() {
     entry = dir.openNextFile();
   }
   dir.close();
-}
 
-void sortScripts() {
-  for (uint8_t i = 1; i < scriptCount; i++) {
-    String key = scriptNames[i];
-    int8_t j = i - 1;
-    while (j >= 0 && strcmp(scriptNames[j].c_str(), key.c_str()) > 0) {
-      scriptNames[j + 1] = scriptNames[j];
-      j--;
-    }
-    scriptNames[j + 1] = key;
-  }
+  sortStrings(scriptNames, scriptCount);
 }
 
 void drawMenu(const String &status) {
   M5.Display.fillScreen(BLACK);
   M5.Display.setCursor(0, 0);
   M5.Display.setTextSize(1);
-  M5.Display.println("DigiStack - fila");
+  M5.Display.println("DigiStack");
   M5.Display.println(sdReady ? "SD: OK" : "SD: FALHA");
 
-  if (scriptCount == 0) {
-    M5.Display.println("Sem scripts em /scripts");
+  if (folderCount == 0) {
+    M5.Display.println("Sem pastas em /scripts");
   } else {
-    uint8_t visibleStart = selectedIndex >= VISIBLE_ROWS - 1 ? selectedIndex - (VISIBLE_ROWS - 2) : 0;
-    for (uint8_t i = visibleStart; i < scriptCount && i < visibleStart + VISIBLE_ROWS; i++) {
-      M5.Display.print(i == selectedIndex ? "> " : "  ");
-      M5.Display.println(scriptNames[i]);
+    uint8_t visibleStart = selectedFolder >= VISIBLE_ROWS - 1 ? selectedFolder - (VISIBLE_ROWS - 2) : 0;
+    for (uint8_t i = visibleStart; i < folderCount && i < visibleStart + VISIBLE_ROWS; i++) {
+      M5.Display.print(i == selectedFolder ? "> " : "  ");
+      M5.Display.println(folderNames[i]);
     }
   }
 
   M5.Display.println();
-  M5.Display.println("A: rolar  B: enviar fila");
+  M5.Display.println("A: trocar  B: executar");
   if (status.length() > 0) {
     M5.Display.println(status);
   }
@@ -133,12 +163,34 @@ bool sendLineAndWaitAck(const String &line, String &errorOut) {
   return true;
 }
 
-bool sendQueue(String &statusOut) {
+bool waitForDigisparkReady(bool &cancelled) {
+  pinMode(PIN_DIGISPARK, INPUT_PULLUP);
+  cancelled = false;
+  unsigned long waitStart = millis();
+
+  while (true) {
+    M5.update();
+    if (M5.BtnA.wasPressed()) {
+      cancelled = true;
+      return false;
+    }
+
+    uint8_t b;
+    if (bbReadByte(PIN_DIGISPARK, b, 200) && b == READY_BYTE) {
+      return true;
+    }
+
+    unsigned long elapsedSec = (millis() - waitStart) / 1000;
+    drawMenu("Aguardando Digispark... " + String(elapsedSec) + "s (A cancela)");
+  }
+}
+
+bool sendQueue(const String &folder, String &statusOut) {
   for (uint8_t f = 0; f < scriptCount; f++) {
-    statusOut = String(f + 1) + "/" + String(scriptCount) + ": " + scriptNames[f];
+    statusOut = folder + " " + String(f + 1) + "/" + String(scriptCount) + ": " + scriptNames[f];
     drawMenu(statusOut);
 
-    String path = String(SCRIPTS_DIR) + "/" + scriptNames[f];
+    String path = String(SCRIPTS_DIR) + "/" + folder + "/" + scriptNames[f];
     File file = SD.open(path);
     if (!file) {
       statusOut = "Erro ao abrir " + scriptNames[f];
@@ -161,7 +213,7 @@ bool sendQueue(String &statusOut) {
     file.close();
   }
 
-  statusOut = "Fila concluida (" + String(scriptCount) + " scripts)";
+  statusOut = folder + " concluido (" + String(scriptCount) + " scripts)";
   return true;
 }
 
@@ -172,8 +224,7 @@ void setup() {
   sdSPI.begin(PIN_SD_SCK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
   sdReady = SD.begin(PIN_SD_CS, sdSPI);
   if (sdReady) {
-    listScripts();
-    sortScripts();
+    listFolders();
   }
 
   pinMode(PIN_DIGISPARK, INPUT_PULLUP);
@@ -184,14 +235,26 @@ void setup() {
 void loop() {
   M5.update();
 
-  if (M5.BtnA.wasPressed() && scriptCount > 0) {
-    selectedIndex = (selectedIndex + 1) % scriptCount;
+  if (M5.BtnA.wasPressed() && folderCount > 0) {
+    selectedFolder = (selectedFolder + 1) % folderCount;
     drawMenu("");
   }
 
-  if (M5.BtnB.wasPressed() && scriptCount > 0) {
+  if (M5.BtnB.wasPressed() && folderCount > 0) {
+    String folder = folderNames[selectedFolder];
+
+    bool cancelled;
     String status;
-    sendQueue(status);
+    if (waitForDigisparkReady(cancelled)) {
+      listScriptsInFolder(folder);
+      if (scriptCount == 0) {
+        status = folder + ": pasta vazia";
+      } else {
+        sendQueue(folder, status);
+      }
+    } else {
+      status = "Cancelado";
+    }
     drawMenu(status);
   }
 

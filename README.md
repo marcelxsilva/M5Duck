@@ -6,10 +6,13 @@ Ferramenta pra automatizar a instalação/execução de um programa em várias m
 
 M5 e Digispark ficam ligados o tempo todo (um fio só, nos dois sentidos). O Digispark precisa estar plugado ao mesmo tempo no M5 (recebendo comandos) **e** na porta USB do computador alvo (digitando). Não existe uma etapa separada de "gravar e depois desplugar" — é tudo em tempo real.
 
-1. M5StickC Plus2 lê os arquivos `.txt` da pasta `/scripts` do SD, em ordem alfabética (isso define a fila: `01_abrir.txt`, `02_instalar.txt`, `03_fechar.txt`...).
-2. Botão B no M5 começa a enviar a fila: linha por linha, de todos os scripts, em sequência.
-3. Cada linha vai pro Digispark pelo fio de dados; o Digispark digita aquela linha na hora (via USB, no computador em que está plugado) e manda de volta um sinal de "ok, pode mandar a próxima" pelo mesmo fio.
-4. M5 só manda a linha seguinte depois desse "ok" — por isso não existe mais limite de 512 bytes por script: nada fica guardado no Digispark, só passa.
+1. Dentro de `/scripts` no SD, cada subpasta é um conjunto de scripts (uma "fila"). Ex.: `/scripts/browser/` com `01_abrir.txt`, `02_youtube.txt`.
+2. Na tela do M5 aparece a lista de pastas pelo nome (`browser`, `terminal`...). Botão A troca a pasta selecionada, botão B escolhe ela.
+3. Depois do botão B, o M5 entra em espera ("Aguardando Digispark...") e **não manda nada ainda**. Botão A nessa hora cancela e volta pra lista.
+4. Só quando o Digispark é plugado numa porta USB e o computador reconhece ele (handshake USB completo) é que o Digispark avisa o M5 pelo fio de dados, e o M5 começa a mandar a fila daquela pasta: os `.txt` de dentro dela, em ordem alfabética, linha por linha.
+5. Cada linha vai pro Digispark pelo fio de dados; o Digispark digita aquela linha na hora (via USB, no computador em que está plugado) e manda de volta um sinal de "ok, pode mandar a próxima" pelo mesmo fio.
+6. M5 só manda a linha seguinte depois desse "ok" — por isso não existe limite de 512 bytes por script: nada fica guardado no Digispark, só passa.
+7. Se o Digispark for desplugado do computador, ele volta a esperar uma nova conexão sozinho; pra rodar em outro PC, repete do passo 2 no M5.
 
 ## Conexão entre as placas
 
@@ -36,7 +39,7 @@ O M5StickC Plus2 não tem slot de SD embutido — precisa de um módulo externo 
 
 ## Scripts
 
-Ficam em `/scripts/*.txt` no cartão SD. Linguagem simples, uma instrução por linha:
+Ficam em `/scripts/<pasta>/*.txt` no cartão SD — uma pasta por fila, nome da pasta é o que aparece no M5. Dentro da pasta, os arquivos rodam em ordem alfabética (`01_`, `02_`...). Linguagem simples, uma instrução por linha:
 
 - `STRING <texto>` — digita o texto literal
 - `DELAY <ms>` — espera
@@ -60,3 +63,4 @@ Limite: **~100 caracteres por linha** (buffer do Digispark). Não tem mais limit
 - Layout de teclado fixo em US International (vem da lib do Digispark).
 - Como tudo é tunelado em tempo real, o Digispark **precisa continuar ligado ao M5** (fio de dados + alimentação) durante todo o tempo em que está plugado no computador alvo. Não dá pra desplugar do M5 e levar só o Digispark.
 - Se faltar o resistor de pull-up no fio de dados, a linha pode ficar em nível indefinido quando ninguém está transmitindo e gerar leitura de lixo nos dois lados.
+- O "plugado no computador" é detectado pelo handshake USB (o host configura o dispositivo). Em hubs/portas problemáticas que demoram pra enumerar, a espera no M5 pode levar alguns segundos extras — isso é normal, não é falha.
