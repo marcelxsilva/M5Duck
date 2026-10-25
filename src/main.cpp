@@ -276,16 +276,23 @@ bool sendQueue(const String &folder, String &statusOut) {
 void setup() {
   auto cfg = M5.config();
   M5.begin(cfg);
+  M5.Display.setRotation(1);
 
   sdSPI.begin(PIN_SD_SCK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
+
+  unsigned long waitStart = millis();
   sdReady = SD.begin(PIN_SD_CS, sdSPI);
-  if (sdReady) {
-    listFolders();
+  while (!sdReady) {
+    drawStatus("SD", TFT_ORANGE, "Procurando cartao SD...", String((millis() - waitStart) / 1000) + "s");
+    delay(1000);
+    SD.end();
+    sdReady = SD.begin(PIN_SD_CS, sdSPI);
   }
+
+  listFolders();
 
   pinMode(PIN_DIGISPARK, INPUT_PULLUP);
 
-  M5.Display.setRotation(1);
   drawList();
 }
 
