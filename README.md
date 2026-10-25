@@ -21,10 +21,12 @@ Fio único, bidirecional (half-duplex): M5 manda comando, Digispark responde "ok
 | Sinal | M5StickC Plus2 | Digispark | Obs. |
 |---|---|---|---|
 | Dados (os dois lados usam o mesmo fio) | G25 | P2 | Precisa de resistor de pull-up (~10kΩ) nesse fio até o 3.3V, pra linha ficar em nível alto quando ninguém está transmitindo. |
-| Alimentação | 3.3V | VCC/5V | ATtiny85 aceita 3.3V direto. Confirme com multímetro qual pino do conector de baixo do M5 é 3.3V antes de ligar. |
+| Alimentação | 3.3V | VCC/5V | **Precisa de um diodo em série** (ex.: 1N5817 ou 1N4148), anodo pro lado do M5 e catodo pro lado do Digispark. Ver aviso abaixo. |
 | Terra | GND | GND | Obrigatório, senão o sinal de dados não funciona. |
 
 Importante: essa alimentação do M5 é só para o Digispark funcionar enquanto recebe/digita. A energia pra fazer o USB-HID conversar com o computador alvo vem da própria porta USB do computador, não do M5.
+
+**Por que o diodo é obrigatório:** enquanto o Digispark só está ligado no M5, ele usa o 3.3V do M5 pra funcionar. No momento em que ele é plugado no computador/celular alvo, a porta USB desse aparelho também manda 5V pro Digispark — as duas fontes ficam ligadas no mesmo fio ao mesmo tempo. Sem o diodo, esse 5V volta pelo fio até o M5 e desestabiliza a alimentação da tela (ela fica piscando). O diodo deixa a energia do M5 ir pro Digispark normalmente, mas bloqueia o 5V de voltar.
 
 SD do M5 (módulo genérico, fios soltos — pino do módulo → pino do M5):
 
