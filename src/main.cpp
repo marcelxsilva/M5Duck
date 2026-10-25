@@ -276,7 +276,7 @@ bool sendQueue(const String &folder, String &statusOut) {
 void setup() {
   auto cfg = M5.config();
   M5.begin(cfg);
-  M5.Display.setRotation(1);
+  M5.Display.setRotation(3);
 
   sdSPI.begin(PIN_SD_SCK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
 
