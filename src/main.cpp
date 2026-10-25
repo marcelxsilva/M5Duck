@@ -84,27 +84,84 @@ void listScriptsInFolder(const String &folder) {
   sortStrings(scriptNames, scriptCount);
 }
 
-void drawMenu(const String &status) {
-  M5.Display.fillScreen(BLACK);
-  M5.Display.setCursor(0, 0);
+static const uint16_t ROW_HEIGHT = 18;
+static const uint16_t HEADER_HEIGHT = 22;
+static const uint16_t FOOTER_HEIGHT = 20;
+
+void drawHeader(const char *title, uint16_t bg) {
+  int w = M5.Display.width();
+  M5.Display.fillRect(0, 0, w, HEADER_HEIGHT, bg);
+  M5.Display.setTextColor(TFT_WHITE, bg);
+  M5.Display.setTextSize(2);
+  M5.Display.setCursor(6, 3);
+  M5.Display.print(title);
+
   M5.Display.setTextSize(1);
-  M5.Display.println("DigiStack");
-  M5.Display.println(sdReady ? "SD: OK" : "SD: FALHA");
+  M5.Display.setCursor(w - 46, 7);
+  M5.Display.print(sdReady ? "SD ok" : "SD !!");
+}
+
+void drawFooterHint(const char *hint) {
+  int w = M5.Display.width();
+  int h = M5.Display.height();
+  M5.Display.drawFastHLine(0, h - FOOTER_HEIGHT, w, TFT_DARKGREY);
+  M5.Display.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  M5.Display.setTextSize(1);
+  M5.Display.setCursor(6, h - FOOTER_HEIGHT + 6);
+  M5.Display.print(hint);
+}
+
+void drawList() {
+  int w = M5.Display.width();
+  M5.Display.fillScreen(TFT_BLACK);
+  drawHeader("DigiStack", TFT_NAVY);
 
   if (folderCount == 0) {
-    M5.Display.println("Sem pastas em /scripts");
+    M5.Display.setTextColor(TFT_RED, TFT_BLACK);
+    M5.Display.setTextSize(1);
+    M5.Display.setCursor(8, HEADER_HEIGHT + 10);
+    M5.Display.print("Sem pastas em /scripts");
   } else {
-    uint8_t visibleStart = selectedFolder >= VISIBLE_ROWS - 1 ? selectedFolder - (VISIBLE_ROWS - 2) : 0;
-    for (uint8_t i = visibleStart; i < folderCount && i < visibleStart + VISIBLE_ROWS; i++) {
-      M5.Display.print(i == selectedFolder ? "> " : "  ");
-      M5.Display.println(folderNames[i]);
+    uint8_t visibleRows = (M5.Display.height() - HEADER_HEIGHT - FOOTER_HEIGHT) / ROW_HEIGHT;
+    uint8_t visibleStart = 0;
+    if (selectedFolder >= visibleRows - 1 && folderCount > visibleRows) {
+      visibleStart = selectedFolder - (visibleRows - 2);
+      if (visibleStart + visibleRows > folderCount) {
+        visibleStart = folderCount - visibleRows;
+      }
+    }
+
+    for (uint8_t i = visibleStart; i < folderCount && i < visibleStart + visibleRows; i++) {
+      int y = HEADER_HEIGHT + (i - visibleStart) * ROW_HEIGHT;
+      bool selected = (i == selectedFolder);
+
+      M5.Display.fillRect(0, y, w, ROW_HEIGHT, selected ? TFT_DARKGREEN : TFT_BLACK);
+      M5.Display.setTextColor(selected ? TFT_WHITE : TFT_DARKGREY, selected ? TFT_DARKGREEN : TFT_BLACK);
+      M5.Display.setTextSize(1);
+      M5.Display.setCursor(10, y + 5);
+      M5.Display.print(selected ? "> " : "  ");
+      M5.Display.print(folderNames[i]);
     }
   }
 
-  M5.Display.println();
-  M5.Display.println("A: trocar  B: executar");
-  if (status.length() > 0) {
-    M5.Display.println(status);
+  drawFooterHint("A: trocar    B: executar");
+}
+
+void drawStatus(const char *title, uint16_t titleColor, const String &message, const String &sub) {
+  int w = M5.Display.width();
+  int h = M5.Display.height();
+  M5.Display.fillScreen(TFT_BLACK);
+  drawHeader(title, titleColor);
+
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+  M5.Display.setTextSize(1);
+  M5.Display.setCursor(8, HEADER_HEIGHT + 14);
+  M5.Display.print(message);
+
+  if (sub.length() > 0) {
+    M5.Display.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    M5.Display.setCursor(8, h - FOOTER_HEIGHT - 16);
+    M5.Display.print(sub);
   }
 }
 
@@ -181,14 +238,13 @@ bool waitForDigisparkReady(bool &cancelled) {
     }
 
     unsigned long elapsedSec = (millis() - waitStart) / 1000;
-    drawMenu("Aguardando Digispark... " + String(elapsedSec) + "s (A cancela)");
+    drawStatus("Aguardando", TFT_ORANGE, "Plugue o Digispark no PC...", String(elapsedSec) + "s - A cancela");
   }
 }
 
 bool sendQueue(const String &folder, String &statusOut) {
   for (uint8_t f = 0; f < scriptCount; f++) {
-    statusOut = folder + " " + String(f + 1) + "/" + String(scriptCount) + ": " + scriptNames[f];
-    drawMenu(statusOut);
+    drawStatus("Executando", TFT_NAVY, scriptNames[f], String(f + 1) + "/" + String(scriptCount) + " - " + folder);
 
     String path = String(SCRIPTS_DIR) + "/" + folder + "/" + scriptNames[f];
     File file = SD.open(path);
@@ -229,7 +285,8 @@ void setup() {
 
   pinMode(PIN_DIGISPARK, INPUT_PULLUP);
 
-  drawMenu("");
+  M5.Display.setRotation(1);
+  drawList();
 }
 
 void loop() {
@@ -237,7 +294,7 @@ void loop() {
 
   if (M5.BtnA.wasPressed() && folderCount > 0) {
     selectedFolder = (selectedFolder + 1) % folderCount;
-    drawMenu("");
+    drawList();
   }
 
   if (M5.BtnB.wasPressed() && folderCount > 0) {
@@ -245,17 +302,26 @@ void loop() {
 
     bool cancelled;
     String status;
+    bool ok = false;
+
     if (waitForDigisparkReady(cancelled)) {
       listScriptsInFolder(folder);
       if (scriptCount == 0) {
         status = folder + ": pasta vazia";
       } else {
-        sendQueue(folder, status);
+        ok = sendQueue(folder, status);
       }
     } else {
-      status = "Cancelado";
+      status = "Cancelado pelo usuario";
     }
-    drawMenu(status);
+
+    drawStatus(ok ? "Concluido" : "Erro", ok ? TFT_DARKGREEN : TFT_RED, status, "Toque A ou B para voltar");
+
+    while (!M5.BtnA.wasPressed() && !M5.BtnB.wasPressed()) {
+      M5.update();
+      delay(10);
+    }
+    drawList();
   }
 
   delay(10);
