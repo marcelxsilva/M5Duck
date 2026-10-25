@@ -26,12 +26,14 @@ Fio único, bidirecional (half-duplex): M5 manda comando, Digispark responde "ok
 
 Importante: essa alimentação do M5 é só para o Digispark funcionar enquanto recebe/digita. A energia pra fazer o USB-HID conversar com o computador alvo vem da própria porta USB do computador, não do M5.
 
-SD do M5 (módulo genérico, fios soltos):
+SD do M5 (módulo genérico, fios soltos — pino do módulo → pino do M5):
 
-| Sinal | M5StickC Plus2 |
+| Pino no módulo SD | M5StickC Plus2 |
 |---|---|
+| 3V3 | 3.3V |
+| GND | GND |
 | CS | G26 |
-| SCK | G0 |
+| CLK (SCK) | G0 |
 | MOSI | G32 |
 | MISO | G33 |
 
