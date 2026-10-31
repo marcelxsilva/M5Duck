@@ -1,16 +1,27 @@
 #include <DigiKeyboard.h>
 
 static const uint8_t DATA_PIN = 2;
+static const uint8_t DATA_MASK = 1 << DATA_PIN;
 static const unsigned int BIT_US = 104;
 static const uint8_t ACK_BYTE = 0x06;
 static const uint8_t READY_BYTE = 0x05;
+static const uint8_t PING_BYTE = 0x07;
 static const uint8_t MAX_LINE_LEN = 100;
+static const unsigned long FOREVER_MS = 0xFFFFFFFFUL;
+
+void driveBit(bool high) {
+  if (high) {
+    DDRB &= ~DATA_MASK;
+  } else {
+    DDRB |= DATA_MASK;
+  }
+}
 
 bool readByteBlocking(uint8_t &out, unsigned long timeoutMs) {
   unsigned long start = millis();
   unsigned long lastPoll = start;
 
-  while (digitalRead(DATA_PIN) == HIGH) {
+  while (PINB & DATA_MASK) {
     unsigned long now = millis();
     if (now - start > timeoutMs) {
       return false;
@@ -21,55 +32,51 @@ bool readByteBlocking(uint8_t &out, unsigned long timeoutMs) {
     }
   }
 
+  uint8_t sreg = SREG;
+  cli();
   delayMicroseconds(BIT_US + BIT_US / 2);
   uint8_t value = 0;
   for (uint8_t i = 0; i < 8; i++) {
-    if (digitalRead(DATA_PIN) == HIGH) {
+    if (PINB & DATA_MASK) {
       value |= (1 << i);
     }
     delayMicroseconds(BIT_US);
   }
-  delayMicroseconds(BIT_US);
+  SREG = sreg;
 
   out = value;
   return true;
 }
 
 void sendByte(uint8_t value) {
-  pinMode(DATA_PIN, OUTPUT);
-  digitalWrite(DATA_PIN, LOW);
+  delayMicroseconds(BIT_US * 3);
+  uint8_t sreg = SREG;
+  cli();
+  driveBit(false);
   delayMicroseconds(BIT_US);
   for (uint8_t i = 0; i < 8; i++) {
-    digitalWrite(DATA_PIN, (value >> i) & 1);
+    driveBit((value >> i) & 1);
     delayMicroseconds(BIT_US);
   }
-  digitalWrite(DATA_PIN, HIGH);
+  driveBit(true);
   delayMicroseconds(BIT_US);
-  pinMode(DATA_PIN, INPUT);
+  SREG = sreg;
 }
 
-void waitUntilConnectedAndSignalReady() {
-  pinMode(DATA_PIN, INPUT);
-  while (usbConfiguration == 0) {
-    DigiKeyboard.update();
-  }
-  sendByte(READY_BYTE);
-}
-
-bool readLine(char *buf, uint8_t maxLen) {
+bool readLine(char *buf, uint8_t maxLen, uint8_t first) {
   uint8_t pos = 0;
+  uint8_t b = first;
 
   while (true) {
-    uint8_t b;
-    if (!readByteBlocking(b, 3000UL)) {
-      return false;
-    }
     if (b == '\n') {
       buf[pos] = '\0';
       return true;
     }
     if (b != '\r' && pos < maxLen - 1) {
       buf[pos++] = b;
+    }
+    if (!readByteBlocking(b, 3000UL)) {
+      return false;
     }
   }
 }
@@ -117,7 +124,7 @@ void typeLine(char *line) {
   }
 
   if (strncmp(line, "GUI ", 4) == 0 && line[4] != '\0') {
-    uint16_t key = keyForLetter(line[4]);
+    uint16_t key = strcmp(line + 4, "SPACE") == 0 ? KEY_SPACE : keyForLetter(line[4]);
     if (key != 0) {
       DigiKeyboard.sendKeyStroke(key, MOD_GUI_LEFT);
     }
@@ -125,25 +132,26 @@ void typeLine(char *line) {
   }
 }
 
-bool signaledReady = false;
-
 void setup() {
-  pinMode(DATA_PIN, INPUT);
+  PORTB &= ~DATA_MASK;
+  driveBit(true);
 }
 
 void loop() {
-  if (usbConfiguration == 0) {
-    signaledReady = false;
+  uint8_t first;
+  if (!readByteBlocking(first, FOREVER_MS)) {
+    return;
   }
 
-  if (!signaledReady) {
-    waitUntilConnectedAndSignalReady();
-    signaledReady = true;
+  if (first == PING_BYTE) {
+    if (usbConfiguration != 0) {
+      sendByte(READY_BYTE);
+    }
     return;
   }
 
   char line[MAX_LINE_LEN];
-  if (readLine(line, MAX_LINE_LEN)) {
+  if (readLine(line, MAX_LINE_LEN, first)) {
     typeLine(line);
     sendByte(ACK_BYTE);
   }
