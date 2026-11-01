@@ -47,6 +47,17 @@ The M5 power only keeps the Digispark alive while it receives and types. The USB
 
 Without the pull-up, the line can float while idle and both sides read garbage.
 
+## 3D-printed case (optional)
+
+![Digispark HAT for M5StickC](case-3d/images/at85-c_19_20191212_17.jpg)
+
+The `case-3d/` folder holds [Digispark HAT for M5StickC](https://www.thingiverse.com/thing:4045319) by [n602](https://www.thingiverse.com/n602/designs) on Thingiverse. It holds the Digispark on the back of the M5 so the pair travels as one piece. It is based on a write-up by Masayuki Tanaka at [Lang-Ship](https://lang-ship.com/blog/?p=1219).
+
+Before printing, note two differences from this project:
+
+- The original wiring uses M5 G0 to Digispark P0 and G26 to P2. M5Duck uses G25 to P2 for data. Wire the case following the diagram above.
+- The design was made for the M5StickC, not the Plus2. Check the fit before printing.
+
 ## Build and flash
 
 M5 firmware, from the repository root:
@@ -79,6 +90,7 @@ See [SCRIPTS.md](SCRIPTS.md) for the format, limits and examples.
 | USB keyboard library for the Digispark | `digispark/lib/DigisparkKeyboard` |
 | Scripts | `scripts/*.txt` |
 | Wiring diagram | `docs/wiring.png` |
+| 3D-printed case (third-party) | `case-3d/` |
 
 ## Known limits
 
@@ -90,7 +102,9 @@ See [SCRIPTS.md](SCRIPTS.md) for the format, limits and examples.
 
 ## License
 
-GNU GPL v3, see [LICENSE](LICENSE).
+GNU GPL v3, see [LICENSE](LICENSE), for everything except `case-3d/`.
+
+`case-3d/` is the work of n602 and keeps its own license, Creative Commons Attribution-NonCommercial-ShareAlike (see `case-3d/LICENSE.txt`). It is not covered by the GPL, and it does not allow commercial use.
 
 ## Credits
 

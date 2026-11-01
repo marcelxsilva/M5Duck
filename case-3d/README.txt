@@ -1,0 +1,4 @@
+Digispark HAT for M5StickC by n602 on Thingiverse: https://www.thingiverse.com/thing:4045319
+
+Summary:
+This thing is a prototype for connecting DigiSpark or compatible to M5StickC.And made with reference to the following site.Lang-Ship"Trial of USB keyboard function with M5StickC and DigiSpark(ATTiny85)" by @tnkmasayukihttps://lang-ship.com/blog/?p=1219-Thanks to Tanaka Masayuki for sharing the details.CAD file; at85-c_27.stp (STEP format)STL files; at85-c_27_top.stl , at85-c_27_btm.stl-requirement.Digispark or compatiblea square pice of universal board (8x9 holes, 21x23mm, t=1.6mm)2.54mm pin header connector2.54mm pin header right anglejumper Header (optional)Please refer to the above site and photos for how to make.-wiring;M5StickC &lt;--&gt; DigisparkGND &lt;--&gt; GND[SDA] GPIO 0 &lt;--&gt; P0[SCK] GPIO26 &lt;--&gt; P2optional; jumper Header &amp; 2.54mm pin header connector(3pin)[. . . ][123]1:=NC2:=DigiSpark[5V_out]3:=M5Stick [5V_in]
